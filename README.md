@@ -95,16 +95,11 @@ doit clear                        # Forget all sessions
 ## 🛣️ Roadmap
 
 - [x] some feature
+![](https://geps.dev/progress/100)
 - [x] another feature
+![](https://geps.dev/progress/100)
 - [ ] not yet implemented feature
-
----
-
-## 📊 Progress
-
-<div class="w3-light-grey w3-round">
-  <div class="w3-container w3-round w3-blue" style="width:25%">25%</div>
-</div>
+![](https://geps.dev/progress/25)
 
 ---
 
@@ -141,3 +136,12 @@ Let’s build something awesome together 🚀
     </tr>
   </tbody>
 </table> -->
+
+> [!IMPORTANT]\
+> Something importang.
+
+> [!WARNING]\
+> Some warning.
+
+> [!NOTE]\
+> Some notes.
