@@ -1,0 +1,278 @@
+#!/usr/bin/env bash
+
+# doit - tmux workspaces and development environments manager
+
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/doit"
+
+TEMPLATES_DIR="$CONFIG_DIR/templates"
+BOILERPLATES_DIR="$CONFIG_DIR/boilerplates"
+
+DEFAULT_TEMPLATE="default"
+
+print_help() {
+    cat <<EOF
+
+✨ DoIt - Terminal Workspace Manager ✨
+
+Usage:
+  doit start [<name>]              Start most recent or specific session
+  doit new [<template>] <name>     Create new session from template
+  doit switch <name>               Switch to an existing session
+  doit list                        List all current tmux sessions
+  doit save                        Save sessions (tmux-resurrect)
+  doit restore                     Restore sessions (tmux-resurrect)
+  doit forget <name>               Kill and forget a session (remove from restore)
+  doit clear                       Kill and forget ALL sessions
+  doit help                        Show this help message
+
+Arguments:
+  <template>       Required template name (JSON-based)
+                   Use default if not specified
+  <name>           Name of the tmux session
+
+Paths:
+  Templates:       $TEMPLATES_DIR
+  Boilerplates:    $BOILERPLATES_DIR
+
+EOF
+}
+
+session_exists() {
+    tmux has-session -t "$1" 2>/dev/null
+}
+
+recent_session() {
+    tmux list-sessions -F '#S' | head -n 1
+}
+
+ensure_dirs() {
+    mkdir -p "$TEMPLATES_DIR"
+    mkdir -p "$BOILERPLATES_DIR"
+}
+
+expand_path() {
+    local input_path="$1"
+    echo "$(cd "$(dirname "${input_path/#\~/$HOME}")" && pwd)/$(basename "$input_path")"
+}
+
+handle_list() {
+    echo "📋 Available tmux sessions:"
+    tmux list-sessions || echo "(no sessions found)"
+}
+
+handle_start() {
+    local name="$1"
+    if [[ -z "$name" ]]; then
+        name=$(recent_session)
+        if [[ -n "$name" ]]; then
+            echo "🚀 Attaching to latest session: $name"
+            tmux attach-session -t "$name"
+        else
+            echo "❌ No sessions found."
+        fi
+    elif session_exists "$name"; then
+        echo "🚀 Attaching to session: $name"
+        tmux attach-session -t "$name"
+    else
+        echo "❌ Session '$name' not found."
+    fi
+}
+
+handle_switch() {
+    local name="$1"
+    if [[ -z "$name" ]]; then
+        echo "❌ Please provide a session name to switch."
+        return 1
+    fi
+    session_exists "$name" && tmux switch-client -t "$name" || echo "❌ Session '$name' not found."
+}
+
+handle_save() {
+    tmux run-shell '~/.tmux/plugins/tmux-resurrect/scripts/save.sh'
+    echo "💾 Sessions saved (tmux-resurrect)."
+}
+
+handle_restore() {
+    tmux run-shell '~/.tmux/plugins/tmux-resurrect/scripts/restore.sh'
+    echo "♻️  Sessions restored (tmux-resurrect)."
+}
+
+handle_forget() {
+    local name="$1"
+    if [[ -z "$name" ]]; then
+        echo "❌ Please provide a session name to forget."
+        return 1
+    fi
+
+    if session_exists "$name"; then
+        echo "🗑️  Killing session '$name'..."
+        tmux kill-session -t "$name"
+        handle_save
+        echo "✅ Session '$name' forgotten."
+    else
+        echo "❌ Session '$name' does not exist."
+    fi
+}
+
+handle_clear() {
+    echo "⚠️ This will kill all tmux sessions and clear resurrect save data."
+    read -rp "Are you sure? [y/N]: " confirm
+    [[ "$confirm" != "y" && "$confirm" != "Y" ]] && echo "❌ Cancelled." && return
+
+    # Kill all tmux sessions
+    echo "🔥 Killing all tmux sessions..."
+    tmux list-sessions -F "#{session_name}" | while read -r session; do
+        tmux kill-session -t "$session"
+    done
+
+    # Clear tmux-resurrect saved state
+    local resurrect_dir="${HOME}/.tmux/resurrect"
+    if [[ -d "$resurrect_dir" ]]; then
+        echo "🧹 Clearing tmux-resurrect saves..."
+        rm -f "$resurrect_dir"/last
+        rm -f "$resurrect_dir"/save_*.txt
+    fi
+
+    echo "✅ All sessions cleared."
+}
+
+handle_create() {
+    local name="$1"
+    local template="$2"
+
+    if [[ -z "$name" ]]; then
+        echo "❌ Missing session name."
+        exit 1
+    fi
+
+    local root_dir raw_input
+    read -rp "📂 Root directory for '$name': " raw_input
+    [[ -z "$raw_input" ]] && echo "❌ No root directory provided." && return 1
+    root_dir="$(expand_path "$raw_input")"
+    [[ ! -d "$root_dir" ]] && echo "📁 Creating root: $root_dir" && mkdir -p "$root_dir"
+    cd "$root_dir" || exit 1
+
+    local template_file="$TEMPLATES_DIR/${template:-default}.json"
+    [[ ! -f "$template_file" ]] && echo "⚠️ Template not found. Using default." && template_file="$TEMPLATES_DIR/default.json"
+
+    if ! command -v jq &>/dev/null; then
+        echo "❌ 'jq' is required but not installed."
+        return 1
+    fi
+
+    local boilerplate
+    boilerplate=$(jq -r '.boilerplate // empty' "$template_file")
+    if [[ -n "$boilerplate" ]]; then
+        local bp_source="$BOILERPLATES_DIR/$boilerplate"
+        if [[ -d "$bp_source" ]]; then
+            echo "📦 Copying boilerplate '$boilerplate'..."
+            cp -r --update=none "$bp_source/"* "$root_dir"
+        else
+            echo "⚠️ Boilerplate '$boilerplate' not found, skipping."
+        fi
+    fi
+
+    # Build project structure
+    jq -r '.structure[]?' "$template_file" | while read -r item; do
+        [[ "$item" == *.* ]] && { [[ ! -f "$item" ]] && echo "📝 Creating file: $item" && touch "$item"; } ||
+        { [[ ! -d "$item" ]] && echo "📂 Creating folder: $item" && mkdir -p "$item"; }
+    done
+
+    echo "🚀 Creating tmux session: $name"
+
+    tmux new-session -d -s "$name" -c "$root_dir"
+    first_window=$(tmux list-windows -t "$name" -F '#I' | head -n1)
+
+    local window_index=0
+
+    jq -c '.layout.windows[]?' "$template_file" | while read -r window; do
+        local win_name=$(echo "$window" | jq -r '.name // "window"')
+
+        if [[ $window_index -eq 0 ]]; then
+            tmux rename-window -t "$name:$first_window" "$win_name"
+        else
+            tmux new-window -t "$name:" -n "$win_name" -c "$root_dir"
+        fi
+
+        local pane_index=0
+        local pane_base_index=$(tmux show -gv pane-base-index 2>/dev/null || echo 0)
+        local actual_pane_index=$((pane_index + pane_base_index))
+        jq -c '.panes[]?' <<< "$window" | while read -r pane; do
+            local cmd=$(echo "$pane" | jq -r '.cmd // ""')
+            local pos=$(echo "$pane" | jq -r '.position // "horizontal"')
+            local size=$(echo "$pane" | jq -r '.size // ""')
+
+            if [[ $pane_index -gt 0 ]]; then
+                if [[ "$pos" == "horizontal" ]]; then
+                    tmux split-window -h -t "$name:$win_name" -c "$root_dir"
+                    if [[ "$size" =~ ^[0-9]+%$ ]]; then
+                        local percent=${size%%%}
+                        local window_width
+                        window_width=$(tmux display-message -p -t "$name:$win_name" '#{window_width}')
+                        local new_width=$(( window_width * percent / 100 ))
+                        tmux resize-pane -t "$name:$win_name.$((pane_index + pane_base_index))" -x "$new_width" 2>/dev/null
+                    fi
+                else
+                    tmux split-window -v -t "$name:$win_name" -c "$root_dir"
+                    if [[ "$size" =~ ^[0-9]+%$ ]]; then
+                        local percent=${size%%%}
+                        local window_height
+                        window_height=$(tmux display-message -p -t "$name:$win_name" '#{window_height}')
+                        local new_height=$(( window_height * percent / 100 ))
+                        tmux resize-pane -t "$name:$win_name.$((pane_index + pane_base_index))" -y "$new_height" 2>/dev/null
+                    fi
+                fi
+            fi
+
+            local actual_pane_index=$((pane_index + pane_base_index))
+            [[ -n "$cmd" ]] && tmux send-keys -t "$name:$win_name.$actual_pane_index" "$cmd" C-m
+            ((pane_index++))
+            ((actual_pane_index++))
+        done
+
+        ((window_index++))
+    done
+
+    echo "🧠 Layout and structure initialized."
+    tmux attach-session -t "$name"
+}
+
+main() {
+    ensure_dirs
+
+    case "$1" in
+        "" | help | --help | -h )
+            print_help
+            ;;
+        list )
+            handle_list
+            ;;
+        start )
+            handle_start "$2"
+            ;;
+        switch )
+            handle_switch "$2"
+            ;;
+        new )
+            handle_create "$2" "$3"
+            ;;
+        save )
+            handle_save
+            ;;
+        restore )
+            handle_restore
+            ;;
+        forget )
+            handle_forget "$2"
+            ;;
+        clear )
+            handle_clear
+            ;;
+        * )
+            echo "❌ Unknown command: $1"
+            print_help
+            ;;
+    esac
+}
+
+main "$@"

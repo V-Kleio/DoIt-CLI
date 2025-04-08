@@ -1,0 +1,22 @@
+{
+  "boilerplate": "tes",
+  "structure": ["src", "logs", "README.md", "doc"],
+  "layout": {
+    "windows": [
+      {
+        "name": "main",
+        "panes": [
+          { "cmd": "ranger", "position": "vertical", "size": "70%" },
+          { "cmd": "ls -la", "position": "vertical", "size": "30%" }
+        ]
+      },
+      {
+        "name": "monitor",
+        "panes": [
+          { "cmd": "btop", "position": "horizontal", "size": "50%" },
+          { "cmd": "ncmpcpp", "position": "horizontal", "size": "50%" }
+        ]
+      }
+    ]
+  }
+}
