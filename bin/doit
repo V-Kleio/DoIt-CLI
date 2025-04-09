@@ -200,27 +200,12 @@ handle_create() {
         jq -c '.panes[]?' <<< "$window" | while read -r pane; do
             local cmd=$(echo "$pane" | jq -r '.cmd // ""')
             local pos=$(echo "$pane" | jq -r '.position // "horizontal"')
-            local size=$(echo "$pane" | jq -r '.size // ""')
 
             if [[ $pane_index -gt 0 ]]; then
                 if [[ "$pos" == "horizontal" ]]; then
                     tmux split-window -h -t "$name:$win_name" -c "$root_dir"
-                    if [[ "$size" =~ ^[0-9]+%$ ]]; then
-                        local percent=${size%%%}
-                        local window_width
-                        window_width=$(tmux display-message -p -t "$name:$win_name" '#{window_width}')
-                        local new_width=$(( window_width * percent / 100 ))
-                        tmux resize-pane -t "$name:$win_name.$((pane_index + pane_base_index))" -x "$new_width" 2>/dev/null
-                    fi
                 else
                     tmux split-window -v -t "$name:$win_name" -c "$root_dir"
-                    if [[ "$size" =~ ^[0-9]+%$ ]]; then
-                        local percent=${size%%%}
-                        local window_height
-                        window_height=$(tmux display-message -p -t "$name:$win_name" '#{window_height}')
-                        local new_height=$(( window_height * percent / 100 ))
-                        tmux resize-pane -t "$name:$win_name.$((pane_index + pane_base_index))" -y "$new_height" 2>/dev/null
-                    fi
                 fi
             fi
 
@@ -229,6 +214,35 @@ handle_create() {
             ((pane_index++))
             ((actual_pane_index++))
         done
+
+        sleep 0.2
+
+        pane_index=0
+        while read -r pane; do
+            local size_width=$(echo "$pane" | jq -r '.size_width // empty')
+            local size_height=$(echo "$pane" | jq -r '.size_height // empty')
+
+            # Adjust width if size_width is provided
+            if [[ -n "$size_width" ]]; then
+                # If the value is positive, grow the pane; if negative, shrink it.
+                if (( size_width > 0 )); then
+                    tmux resize-pane -R -t "$name:$win_name.$((pane_index + pane_base_index))" "$size_width" 2>/dev/null
+                else
+                    tmux resize-pane -L -t "$name:$win_name.$((pane_index + pane_base_index))" "$(( -1 * size_width ))" 2>/dev/null
+                fi
+            fi
+
+            # Adjust height if size_height is provided
+            if [[ -n "$size_height" ]]; then
+                if (( size_height > 0 )); then
+                    tmux resize-pane -D -t "$name:$win_name.$((pane_index + pane_base_index))" "$size_height" 2>/dev/null
+                else
+                    tmux resize-pane -U -t "$name:$win_name.$((pane_index + pane_base_index))" "$(( -1 * size_height ))" 2>/dev/null
+                fi
+            fi
+
+            ((pane_index++))
+        done < <(jq -c '.panes[]?' <<< "$window")
 
         ((window_index++))
     done

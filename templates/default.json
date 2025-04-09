@@ -6,15 +6,15 @@
       {
         "name": "main",
         "panes": [
-          { "cmd": "ranger", "position": "vertical", "size": "70%" },
-          { "cmd": "ls -la", "position": "vertical", "size": "30%" }
+          { "cmd": "ranger", "position": "vertical" },
+          { "cmd": "ls -la", "position": "vertical" }
         ]
       },
       {
         "name": "monitor",
         "panes": [
-          { "cmd": "btop", "position": "horizontal", "size": "50%" },
-          { "cmd": "ncmpcpp", "position": "horizontal", "size": "50%" }
+          { "cmd": "btop", "position": "horizontal" },
+          { "cmd": "ncmpcpp", "position": "horizontal" }
         ]
       }
     ]
