@@ -95,7 +95,9 @@ handle_save() {
     local status=$?
     if [[ $status -eq 0 ]]; then
         echo "💾 Sessions saved (tmux-resurrect)."
-        tmux kill-session -t save_dummy
+        if session_exists "save_dummy"; then
+            tmux kill-session -t save_dummy
+        fi
     else
         echo "❌ Saving sessions (tmux-ressurect) failed."
     fi
