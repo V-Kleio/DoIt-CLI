@@ -88,13 +88,37 @@ handle_switch() {
 }
 
 handle_save() {
-    tmux run-shell '~/.tmux/plugins/tmux-resurrect/scripts/save.sh'
-    echo "💾 Sessions saved (tmux-resurrect)."
+    if ! tmux list-sessions 2>/dev/null | grep -q .; then
+        tmux new-session -d -s save_dummy
+    fi
+    tmux run-shell '$HOME/.tmux/plugins/tmux-resurrect/scripts/save.sh'
+    local status=$?
+    if [[ $status -eq 0 ]]; then
+        echo "💾 Sessions saved (tmux-resurrect)."
+        tmux kill-session -t save_dummy
+    else
+        echo "❌ Saving sessions (tmux-ressurect) failed."
+    fi
 }
 
 handle_restore() {
-    tmux run-shell '~/.tmux/plugins/tmux-resurrect/scripts/restore.sh'
-    echo "♻️  Sessions restored (tmux-resurrect)."
+    if ! tmux list-sessions 2>/dev/null | grep -q .; then
+        tmux new-session -d -s restore_dummy
+    fi
+
+    tmux run-shell '$HOME/.tmux/plugins/tmux-resurrect/scripts/restore.sh'
+    if session_exists "save_dummy"; then
+        tmux kill-session -t save_dummy
+    fi
+    if session_exists "restore_dummy"; then
+        tmux kill-session -t restore_dummy
+    fi
+    local status=$?
+    if [[ $status -eq 0 ]]; then
+        echo "♻️  Sessions restored (tmux-resurrect)."
+    else
+        echo "❌ Restoring sessions (tmux-ressurect) failed."
+    fi
 }
 
 handle_forget() {
@@ -115,7 +139,7 @@ handle_forget() {
 }
 
 handle_clear() {
-    echo "⚠️ This will kill all tmux sessions and clear resurrect save data."
+    echo "⚠️ This will kill all tmux sessions."
     read -rp "Are you sure? [y/N]: " confirm
     [[ "$confirm" != "y" && "$confirm" != "Y" ]] && echo "❌ Cancelled." && return
 
@@ -124,14 +148,6 @@ handle_clear() {
     tmux list-sessions -F "#{session_name}" | while read -r session; do
         tmux kill-session -t "$session"
     done
-
-    # Clear tmux-resurrect saved state
-    local resurrect_dir="${HOME}/.tmux/resurrect"
-    if [[ -d "$resurrect_dir" ]]; then
-        echo "🧹 Clearing tmux-resurrect saves..."
-        rm -f "$resurrect_dir"/last
-        rm -f "$resurrect_dir"/save_*.txt
-    fi
 
     echo "✅ All sessions cleared."
 }
