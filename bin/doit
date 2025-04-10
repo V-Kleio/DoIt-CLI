@@ -162,11 +162,15 @@ handle_create() {
     fi
 
     local root_dir raw_input
-    read -rp "📂 Root directory for '$name': " raw_input
-    [[ -z "$raw_input" ]] && echo "❌ No root directory provided." && return 1
-    root_dir="$(expand_path "$raw_input")"
-    [[ ! -d "$root_dir" ]] && echo "📁 Creating root: $root_dir" && mkdir -p "$root_dir"
-    cd "$root_dir" || exit 1
+    read -rp "📂 Root directory for '$name' (Press Enter to use current directory): " raw_input
+    if [[ -z "$raw_input" ]]; then
+        root_dir="$(pwd)"
+        echo "ℹ️  Using current directory as root: $root_dir"
+    else
+        root_dir="$(expand_path "$raw_input")"
+        [[ ! -d "$root_dir" ]] && echo "📁 Creating root: $root_dir" && mkdir -p "$root_dir"
+        cd "$root_dir" || exit 1
+    fi
 
     local template_file="$TEMPLATES_DIR/${template:-default}.json"
     [[ ! -f "$template_file" ]] && echo "⚠️ Template not found. Using default." && template_file="$TEMPLATES_DIR/default.json"
