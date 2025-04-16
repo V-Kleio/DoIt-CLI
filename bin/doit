@@ -82,9 +82,27 @@ handle_list() {
 handle_start() {
     local name="$1"
     if [[ -z "$name" ]]; then
-        name=$(recent_session)
-        if [[ -z "$name" ]]; then
+        local sessions=($(tmux list-sessions -F "#S" 2>/dev/null || echo ""))
+
+        if [[ ${#sessions[@]} -eq 0 ]]; then
             echo "❌ No sessions found."
+            return 1
+        fi
+
+        if [[ ${#sessions[@]} -eq 1 ]]; then
+            name="${sessions[0]}"
+        else
+            echo "📋 Select a session to attach to:"
+            select option in "${sessions[@]}"; do
+                if [[ -n "$option" ]]; then
+                    name="$option"
+                    break
+                fi
+            done
+        fi
+
+        if [[ -z "$name" ]]; then
+            echo "❌ No session selected."
             return 1
         fi
     fi
