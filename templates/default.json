@@ -1,20 +1,14 @@
 {
-  "boilerplate": "tes",
-  "structure": ["src", "logs", "README.md", "doc"],
+  "name": "Default Development Template",
+  "description": "A standard development workspace with editor, terminal, and monitoring",
   "layout": {
     "windows": [
       {
-        "name": "main",
+        "name": "code",
         "panes": [
-          { "cmd": "ranger", "position": "vertical" },
-          { "cmd": "ls -la", "position": "vertical" }
-        ]
-      },
-      {
-        "name": "monitor",
-        "panes": [
-          { "cmd": "btop", "position": "horizontal" },
-          { "cmd": "ncmpcpp", "position": "horizontal" }
+          { 
+            "cmd": "echo '✨ Welcome to your dev environment!'"
+          }
         ]
       }
     ]
