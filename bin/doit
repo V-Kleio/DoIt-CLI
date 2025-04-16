@@ -8,6 +8,7 @@ TEMPLATES_DIR="$CONFIG_DIR/templates"
 BOILERPLATES_DIR="$CONFIG_DIR/boilerplates"
 
 DEFAULT_TEMPLATE="default"
+SESSION_REGISTRY="$CONFIG_DIR/sessions.json"
 
 print_help() {
     cat <<EOF
@@ -55,6 +56,24 @@ expand_path() {
     echo "$(cd "$(dirname "${input_path/#\~/$HOME}")" && pwd)/$(basename "$input_path")"
 }
 
+register_session() {
+    local name="$1"
+    local template="$2"
+
+    [[ -f "$SESSION_REGISTRY" ]] && echo "{}" > "$SESSION_REGISTRY"
+
+    local tmp_file=$(mktemp)
+    jq --arg name "$name" --arg template "$template" '.[$name] = $template' "$SESSION_REGISTRY" > "$tmp_file"
+    mv "$tmp_file" "$SESSION_REGISTRY"
+}
+
+get_session_template() {
+    local name="$1"
+    [[ ! -f "$SESSION_REGISTRY" ]] && echo "default" && return
+
+    jq -r --arg name "$name" '.[$name] // "default"' "$SESSION_REGISTRY"
+}
+
 handle_list() {
     echo "📋 Available tmux sessions:"
     tmux list-sessions || echo "(no sessions found)"
@@ -64,14 +83,49 @@ handle_start() {
     local name="$1"
     if [[ -z "$name" ]]; then
         name=$(recent_session)
-        if [[ -n "$name" ]]; then
-            echo "🚀 Attaching to latest session: $name"
-            tmux attach-session -t "$name"
-        else
+        if [[ -z "$name" ]]; then
             echo "❌ No sessions found."
+            return 1
         fi
-    elif session_exists "$name"; then
+    fi
+
+    if session_exists "$name"; then
         echo "🚀 Attaching to session: $name"
+
+        local template
+        template=$(tmux display-message -p -t "$name" '#{@doit-template}' 2>/dev/null)
+        [[ -z "$template" ]] && template=$(get_session_template "$name")
+
+        if [[ -n "$template" ]]; then
+            echo "🔄 Rerunning session commands..."
+            local template_file="$TEMPLATES_DIR/${template}.json"
+
+            if [[ -f "$template_file" ]]; then
+                local root_dir
+                root_dir=$(tmux display-message -p -t "$name" '#{pane_current_path}')
+
+                jq -c '.layout.windows[]?' "$template_file" | while read -r window; do
+                    local win_name=$(echo "$window" | jq -r '.name // "window"')
+
+                    if tmux list-windows -t "$name" | grep -q "$win_name"; then
+                        local pane_index=0
+                        local pane_base_index=$(tmux show -gv pane-base-index 2>/dev/null || echo 0)
+
+                        jq -c '.panes[]?' <<< "$window" | while read -r pane; do
+                            local cmd=$(echo "$pane" | jq -r '.cmd // ""')
+                            local actual_pane_index=$((pane_index + pane_base_index))
+                            
+                            if tmux list-panes -t "$name:$win_name" | grep -q "^$actual_pane_index:"; then
+                                [[ -n "$cmd" ]] && tmux send-keys -t "$name:$win_name.$actual_pane_index" C-c C-l "$cmd" C-m
+                            fi
+
+                            ((pane_index++))
+                        done
+                    fi
+                done
+            fi
+        fi
+
         tmux attach-session -t "$name"
     else
         echo "❌ Session '$name' not found."
@@ -94,12 +148,12 @@ handle_save() {
     tmux run-shell '$HOME/.tmux/plugins/tmux-resurrect/scripts/save.sh'
     local status=$?
     if [[ $status -eq 0 ]]; then
-        echo "💾 Sessions saved (tmux-resurrect)."
+        echo "💾 Sessions saved."
         if session_exists "save_dummy"; then
             tmux kill-session -t save_dummy
         fi
     else
-        echo "❌ Saving sessions (tmux-ressurect) failed."
+        echo "❌ Saving sessions failed."
     fi
 }
 
@@ -117,9 +171,9 @@ handle_restore() {
     fi
     local status=$?
     if [[ $status -eq 0 ]]; then
-        echo "♻️  Sessions restored (tmux-resurrect)."
+        echo "♻️  Sessions restored."
     else
-        echo "❌ Restoring sessions (tmux-ressurect) failed."
+        echo "❌ Restoring sessions failed."
     fi
 }
 
@@ -133,6 +187,11 @@ handle_forget() {
     if session_exists "$name"; then
         echo "🗑️  Killing session '$name'..."
         tmux kill-session -t "$name"
+
+        local tmp_file=$(mktemp)
+        jq --arg name "$name" 'del(.[$name])' "$SESSION_REGISTRY" > "$tmp_file"
+        mv "$tmp_file" "$SESSION_REGISTRY"
+
         handle_save
         echo "✅ Session '$name' forgotten."
     else
@@ -203,6 +262,10 @@ handle_create() {
     echo "🚀 Creating tmux session: $name"
 
     tmux new-session -d -s "$name" -c "$root_dir"
+
+    tmux set-option -t "$name" @doit-template "${template:-default}"
+    register_session "$name" "${template:-default}"
+
     first_window=$(tmux list-windows -t "$name" -F '#I' | head -n1)
 
     local window_index=0
