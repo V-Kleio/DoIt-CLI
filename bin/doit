@@ -19,6 +19,7 @@ Usage:
   doit start [<name>]              Start most recent or specific session
   doit new <name> [<template>]     Create new session from template
   doit switch <name>               Switch to an existing session
+  doit rename <old> <new>          Rename a session
   doit list                        List all current tmux sessions
   doit save                        Save sessions (tmux-resurrect)
   doit restore                     Restore sessions (tmux-resurrect)
@@ -176,10 +177,31 @@ handle_start() {
 handle_switch() {
     local name="$1"
     if [[ -z "$name" ]]; then
-        echo "❌ Please provide a session name to switch."
-        return 1
+        local sessions=($(tmux list-sessions -F "#S" 2>/dev/null || echo ""))
+
+        if [[ ${#sessions[@]} -eq 0 ]]; then
+            echo "❌ No sessions found."
+            return 1
+        fi
+
+        if [[ ${#sessions[@]} -eq 1 ]]; then
+            name="${sessions[0]}"
+        else
+            echo "📋 Select a session to attach to:"
+            select option in "${sessions[@]}"; do
+                if [[ -n "$option" ]]; then
+                    name="$option"
+                    break
+                fi
+            done
+        fi
+
+        if [[ -z "$name" ]]; then
+            echo "❌ No session selected."
+            return 1
+        fi
     fi
-    session_exists "$name" && tmux switch-client -t "$name" || echo "❌ Session '$name' not found."
+    tmux switch-client -t "$name" || echo "❌ Session '$name' not found."
 }
 
 handle_save() {
