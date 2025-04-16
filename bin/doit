@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# Current version: 1.0.0-rc+001
 # doit - tmux workspaces and development environments manager
 
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/doit"
