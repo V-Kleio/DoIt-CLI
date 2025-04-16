@@ -17,7 +17,7 @@ print_help() {
 
 Usage:
   doit start [<name>]              Start most recent or specific session
-  doit new [<template>] <name>     Create new session from template
+  doit new <name> [<template>]     Create new session from template
   doit switch <name>               Switch to an existing session
   doit list                        List all current tmux sessions
   doit save                        Save sessions (tmux-resurrect)
@@ -219,7 +219,7 @@ handle_create() {
 
     if [[ -z "$name" ]]; then
         echo "❌ Missing session name."
-        exit 1
+        return 1
     fi
 
     local root_dir raw_input
@@ -230,7 +230,7 @@ handle_create() {
     else
         root_dir="$(expand_path "$raw_input")"
         [[ ! -d "$root_dir" ]] && echo "📁 Creating root: $root_dir" && mkdir -p "$root_dir"
-        cd "$root_dir" || exit 1
+        cd "$root_dir" || return 1
     fi
 
     local template_file="$TEMPLATES_DIR/${template:-default}.json"
