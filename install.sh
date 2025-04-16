@@ -18,7 +18,6 @@ BOILERPLATES_DIR="$CONFIG_DIR/boilerplates"
 TEMP_DIR=$(mktemp -d)
 
 cleanup() {
-    echo -e "${BLUE}Cleaning up temporary files...${NC}"
     rm -rf "$TEMP_DIR"
 }
 
@@ -123,49 +122,53 @@ detect_shell() {
 
 main() {
     print_header
-    
+
     INSTALL_MODE=$(detect_installation_mode)
-    
+
     if [[ "$INSTALL_MODE" == "remote" ]]; then
         echo -e "${BLUE}Installing from remote repository...${NC}"
         download_project
         SCRIPT_DIR="$TEMP_DIR/tmux-doit"
+        sleep 2
     else
         echo -e "${BLUE}Installing from local directory...${NC}"
         SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+        sleep 2
     fi
 
     echo -e "${BLUE}Checking requirements...${NC}"
-    
+
     if ! command -v tmux >/dev/null 2>&1; then
         echo -e "${RED}❌ tmux is not installed. Please install it first.${NC}"
         exit 1
     fi
-    
+
     if ! command -v jq >/dev/null 2>&1; then
         echo -e "${RED}❌ jq is not installed. Please install it first.${NC}"
         exit 1
     fi
-    
+
+    sleep 2
     echo -e "${GREEN}✅ All requirements satisfied${NC}"
     echo
 
     echo -e "${BLUE}Creating directories...${NC}"
-    
+
     if [ "$GLOBAL_INSTALL" = true ]; then
         sudo mkdir -p "$INSTALL_DIR" || { echo -e "${RED}❌ Failed to create $INSTALL_DIR${NC}"; exit 1; }
     else
         mkdir -p "$INSTALL_DIR" || { echo -e "${RED}❌ Failed to create $INSTALL_DIR${NC}"; exit 1; }
     fi
-    
+
     mkdir -p "$TEMPLATES_DIR" || { echo -e "${RED}❌ Failed to create $TEMPLATES_DIR${NC}"; exit 1; }
     mkdir -p "$BOILERPLATES_DIR" || { echo -e "${RED}❌ Failed to create $BOILERPLATES_DIR${NC}"; exit 1; }
-    
+
+    sleep 2
     echo -e "${GREEN}✅ Directories created${NC}"
     echo
 
     echo -e "${BLUE}Installing doit CLI...${NC}"
-    
+
     if [ "$GLOBAL_INSTALL" = true ]; then
         sudo cp "$SCRIPT_DIR/bin/doit" "$INSTALL_DIR/" || { echo -e "${RED}❌ Failed to copy doit script${NC}"; exit 1; }
         sudo chmod +x "$INSTALL_DIR/doit" || { echo -e "${RED}❌ Failed to make doit script executable${NC}"; exit 1; }
@@ -173,14 +176,15 @@ main() {
         cp "$SCRIPT_DIR/bin/doit" "$INSTALL_DIR/" || { echo -e "${RED}❌ Failed to copy doit script${NC}"; exit 1; }
         chmod +x "$INSTALL_DIR/doit" || { echo -e "${RED}❌ Failed to make doit script executable${NC}"; exit 1; }
     fi
-    
+
+    sleep 2
     echo -e "${GREEN}✅ doit CLI installed${NC}"
     echo
 
     echo -e "${BLUE}Installing default templates...${NC}"
-    
+
     cp -n "$SCRIPT_DIR/templates/"*.json "$TEMPLATES_DIR/" 2>/dev/null || true
-    
+
     if [ ! -f "$TEMPLATES_DIR/default.json" ]; then
         cp "$SCRIPT_DIR/templates/default.json" "$TEMPLATES_DIR/" || {
             echo -e "${YELLOW}⚠️  Could not find default template, creating minimal one${NC}"
@@ -204,10 +208,12 @@ main() {
 EOF
         }
     fi
-    
+
+    sleep 2
     echo -e "${GREEN}✅ Templates installed${NC}"
     echo
 
+    sleep 1
     echo -e "${GREEN}🎉 Installation complete!${NC}"
     echo
     
