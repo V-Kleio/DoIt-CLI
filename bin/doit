@@ -16,7 +16,8 @@ print_help() {
 ✨ DoIt - Terminal Workspace Manager ✨
 
 Usage:
-  doit start [<name>]              Start most recent or specific session
+  doit start [<name>] [--no-run]   Start most recent or specific session
+                                   Use --no-run to skip executing commands
   doit new <name> [<template>]     Create new session from template
   doit switch <name>               Switch to an existing session
   doit rename <old> <new>          Rename a session
@@ -105,6 +106,8 @@ handle_list() {
 
 handle_start() {
     local name="$1"
+    local no_run="$2"
+
     if [[ -z "$name" ]]; then
         local sessions=($(tmux list-sessions -F "#S" 2>/dev/null || echo ""))
 
@@ -138,7 +141,7 @@ handle_start() {
         template=$(tmux display-message -p -t "$name" '#{@doit-template}' 2>/dev/null)
         [[ -z "$template" ]] && template=$(get_session_template "$name")
 
-        if [[ -n "$template" ]]; then
+        if [[ -n "$template" && "$no_run" != "true" ]]; then
             echo "🔄 Rerunning session commands..."
             local template_file="$TEMPLATES_DIR/${template}.json"
 
@@ -455,7 +458,13 @@ main() {
             handle_list
             ;;
         start )
-            handle_start "$2"
+            if [[ "$2" =~ ^-(n|N)$|^--no-run$ ]]; then
+                handle_start "$3" "true"
+            elif [[ "$3" =~ ^-(n|N)$|^--no-run$ ]]; then
+                handle_start "$2" "true"
+            else
+                handle_start "$2" "false"
+            fi
             ;;
         switch )
             handle_switch "$2"
