@@ -76,7 +76,30 @@ get_session_template() {
 
 handle_list() {
     echo "📋 Available tmux sessions:"
-    tmux list-sessions || echo "(no sessions found)"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    if ! tmux list-sessions &>/dev/null; then
+        echo "No active sessions found."
+        return
+    fi
+    
+    printf "%-15s | %-10s | %-7s | %-25s\n" "SESSION" "TEMPLATE" "WINDOWS" "ROOT DIRECTORY"
+    echo "────────────────┼────────────┼─────────┼─────────────────────────"
+    
+    while IFS= read -r session; do
+        local name=$(echo "$session" | awk '{print $1}' | sed 's/://g')
+        local num_windows=$(tmux list-windows -t "$name" 2>/dev/null | wc -l)
+        local template=$(tmux display-message -p -t "$name" '#{@doit-template}' 2>/dev/null)
+        [[ -z "$template" ]] && template=$(get_session_template "$name")
+        [[ -z "$template" ]] && template="unknown"
+        
+        local root_dir=$(tmux display-message -p -t "$name" '#{pane_current_path}' 2>/dev/null)
+        root_dir=$(basename "$root_dir")
+        
+        printf "%-15s | %-10s | %-7s | %-25s\n" "$name" "$template" "$num_windows" "$root_dir"
+    done < <(tmux list-sessions 2>/dev/null)
+    
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 }
 
 handle_start() {
