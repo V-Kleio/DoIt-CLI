@@ -377,6 +377,51 @@ handle_create() {
     tmux attach-session -t "$name"
 }
 
+handle_rename() {
+    local old_name="$1"
+    local new_name="$2"
+    
+    if [[ -z "$old_name" || -z "$new_name" ]]; then
+        echo "❌ Both old and new session names are required."
+        echo "Usage: doit rename <old_name> <new_name>"
+        return 1
+    fi
+    
+    if ! session_exists "$old_name"; then
+        echo "❌ Session '$old_name' does not exist."
+        return 1
+    fi
+    
+    if session_exists "$new_name"; then
+        echo "❌ Session '$new_name' already exists."
+        return 1
+    fi
+    
+    # Get the template before renaming
+    local template
+    template=$(tmux display-message -p -t "$old_name" '#{@doit-template}' 2>/dev/null)
+    [[ -z "$template" ]] && template=$(get_session_template "$old_name")
+    
+    # Rename the tmux session
+    tmux rename-session -t "$old_name" "$new_name"
+    
+    if [[ $? -eq 0 ]]; then
+        # Update session registry
+        local tmp_file=$(mktemp)
+        jq --arg old "$old_name" --arg new "$new_name" --arg template "$template" \
+           'del(.[$old]) | .[$new] = $template' "$SESSION_REGISTRY" > "$tmp_file"
+        mv "$tmp_file" "$SESSION_REGISTRY"
+        
+        # Set the template option on the renamed session
+        tmux set-option -t "$new_name" @doit-template "$template"
+        
+        echo "✅ Session renamed from '$old_name' to '$new_name'."
+    else
+        echo "❌ Failed to rename session."
+        return 1
+    fi
+}
+
 main() {
     ensure_dirs
 
@@ -407,6 +452,9 @@ main() {
             ;;
         clear )
             handle_clear
+            ;;
+        rename )
+            handle_rename "$2" "$3"
             ;;
         * )
             echo "❌ Unknown command: $1"
