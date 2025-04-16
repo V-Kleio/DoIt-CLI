@@ -60,7 +60,7 @@ register_session() {
     local name="$1"
     local template="$2"
 
-    [[ -f "$SESSION_REGISTRY" ]] && echo "{}" > "$SESSION_REGISTRY"
+    [[ ! -f "$SESSION_REGISTRY" ]] && echo "{}" > "$SESSION_REGISTRY"
 
     local tmp_file=$(mktemp)
     jq --arg name "$name" --arg template "$template" '.[$name] = $template' "$SESSION_REGISTRY" > "$tmp_file"
