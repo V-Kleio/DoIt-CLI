@@ -66,10 +66,7 @@ No more tedious terminal command. Just define it once — then **DoIt**.
 - `tmux` installed
 - `jq` required for parsing JSON
 
-> [!NOTE]
-> For tmux-resurrect integration, make sure tmux-resurrect is installed at `~/.tmux/plugins/tmux-resurrect/`.
-
-### 📦 Quick Install (One-Liner)
+### 📦 Quick Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/V-Kleio/DoIt-CLI/main/install.sh | bash
@@ -77,7 +74,7 @@ curl -fsSL https://raw.githubusercontent.com/V-Kleio/DoIt-CLI/main/install.sh | 
 
 ### Alternative Installation Methods
 
-#### Manual Install (Local User)
+#### Manual Install
 
 ```bash
 git clone https://github.com/V-Kleio/DoIt-CLI.git
@@ -96,33 +93,90 @@ curl -fsSL https://raw.githubusercontent.com/V-Kleio/DoIt-CLI/main/install.sh | 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/V-Kleio/DoIt-CLI/main/install.sh | bash -s -- --prefix=~/bin
 ```
-
-After installation, make sure the installation directory is in your PATH.
+> [!IMPORTANT]
+> After installation, make sure the installation directory is in your PATH.
 
 ---
 
 ## 🚀 Usage
 
+### Basic Command Structure
 ```bash
-doit new my-session               # Create new session named 
-                                  # my-session using default template
-
-doit new my-session web-dev       # Create new session from 'web-dev' template
-
-doit start my-session             # Resume session
-
-doit switch my-session            # Switch to an existing session
-
-doit list                         # List all tmux sessions
-
-doit save                         # Save sessions (via tmux-resurrect)
-
-doit restore                      # Restore sessions
-
-doit forget my-session            # Kill & forget a session
-
-doit clear                        # Forget all sessions
+doit <command> [options] [arguments]
 ```
+
+### Session Management
+
+**Create a new session**
+```bash
+doit new <session-name> [template-name]  # Create session with optional template
+                                         # Uses 'default' template if not specified
+```
+
+> [!WARNING]
+> Always review template JSON files from untrusted sources before using them with DoIt.
+
+**Start or attach to an existing session**
+```bash
+doit start [session-name]                # Start/attach to session
+doit start [session-name] --no-run       # Start without re-running commands
+```
+
+**Switch between sessions (when already in tmux)**
+```bash
+doit switch [session-name]               # Switch to session (interactive if no name)
+```
+
+**Session listing and status**
+```bash
+doit list                                # Show all active tmux sessions
+```
+
+**Manage sessions**
+```bash
+doit rename <old-name> <new-name>        # Rename an existing session
+doit forget <session-name>               # Kill session and remove from registry
+doit clear                               # Kill and forget ALL sessions
+```
+
+### Persistence with tmux-resurrect
+
+> [!NOTE]
+> For tmux-resurrect integration, make sure tmux-resurrect is installed at `~/.tmux/plugins/tmux-resurrect/`. For more info on how to install: https://github.com/tmux-plugins/tmux-resurrect
+
+**Save and restore sessions**
+```bash
+doit save                                # Save all sessions with tmux-resurrect
+doit restore                             # Restore previously saved sessions
+```
+
+### Examples
+
+**Create a development environment**
+```bash
+# Create a new web project
+doit new mywebsite web-dev
+
+# Create a Python project with default template
+doit new python-api
+
+# After done with your work, you can save the sessions
+doit save
+```
+
+**Daily workflow**
+```bash
+# Start your day by restoring previous sessions
+doit restore
+
+# Resume work on a specific project
+doit start mywebsite
+
+# Switch between projects (while in tmux)
+doit switch python-api
+```
+
+For more information, run `doit help` in your terminal.
 
 ---
 
@@ -144,19 +198,10 @@ doit/
 ## 🛣️ Roadmap
 
 - [x] Core session management functionality
-![](https://geps.dev/progress/100)
 - [x] Template-based workspace creation
-![](https://geps.dev/progress/100)
 - [x] tmux-resurrect integration
-![](https://geps.dev/progress/100)
-- [ ] Tab completion for session names and commands
-![](https://geps.dev/progress/60)
-- [ ] Visual layout preview
-![](https://geps.dev/progress/40)
 - [ ] Template management commands
-![](https://geps.dev/progress/20)
 - [ ] Plugin system for extensions
-![](https://geps.dev/progress/10)
 
 ---
 
@@ -193,12 +238,3 @@ Let’s build something awesome together 🚀
     </tr>
   </tbody>
 </table> -->
-
-> [!IMPORTANT]\
-> Something importang.
-
-> [!WARNING]\
-> Some warning.
-
-> [!NOTE]\
-> Some notes.
